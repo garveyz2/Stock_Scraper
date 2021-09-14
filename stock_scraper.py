@@ -89,6 +89,6 @@ while i < len(stocklist_file):
         Moving_Average = Moving_Average / 10 
         new_data.append([Stock_Name, OBV_Value, Moving_Average])  
     i += 1
-df = pd.DataFrame(new_data, columns = ['Stock', 'OBV_Value'])  # Creates a new dataframe from the new_data list
+df = pd.DataFrame(new_data, columns = ['Stock', 'OBV_Value','Moving_Average'])  # Creates a new dataframe from the new_data list
 df.sort_values("OBV_Value", inplace = True, ascending = False)  # Sort the ranked stocks
 df.to_csv("./Stock_Report/OBV_Ranked.csv", index = False)  # Save the dataframe to a csv without the index column
