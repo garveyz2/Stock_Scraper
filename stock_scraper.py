@@ -7,8 +7,15 @@ Original file is located at
     https://colab.research.google.com/drive/12DHn1FKPCfx1f-BkIi_5nqtjg4_jnZiY
 """
 
-import yfinance as yf, pandas as pd, shutil, os, time, glob, smtplib, ssl
+import yfinance as yf
+import pandas as pd
+import shutil
+import os 
+import glob
 import requests
+import time
+import ssl
+import smtplib
 import bs4 as bs
 
 #scrape for tickers from s&p500
@@ -29,59 +36,59 @@ industries = list(map(lambda s: s.strip(), industries))
 print("The amount of stocks chosen to observe: " + str(len(tickers)))
 
 # These two lines remove the Stocks folder and then recreate it in order to remove old stocks.
-shutil.rmtree("./Daily_Stock_Report/Stocks/")
-os.mkdir("./Daily_Stock_Report/Stocks/")
+if os.path.isdir("./Stock_Report/Stocks/"):
+    shutil.rmtree("./Stock_Report/Stocks/")
+os.mkdir("./Stock_Report/Stocks/")
 # Holds the amount of API calls we executed
-API_Calls = 0
+# API_Calls = 0
 failure = 0
-not_imported = 0
 # Used to iterate through our list of tickers
 i=0
 
-while (i < len(tickers)) and (API_Calls < 600):
+while (i < len(tickers)):
     try:
         stock = tickers[i]  
-        temp = yf.Ticker(str(stock))
-        hist_data = temp.history(period="5y")  
-        hist_data.to_csv("./Daily_Stock_Report/Stocks/"+stock+".csv")  
-        time.sleep(2)  # Pauses the loop for two seconds
-        API_Calls += 1 
+        temp = yf.Ticker(stock)
+        hist_data = temp.history(period="1y")  
+        hist_data.to_csv("./Stock_Report/Stocks/"+stock+".csv")  
+        time.sleep(2) 
+        # API_Calls += 1 
         i += 1  
     except ValueError:
-        print("Yahoo Finance Backend Error, Attempting to Fix")  # An error occured on Yahoo Finance's backend. We will attempt to retreive the data again
-        if failure > 5:  # Move on to the next ticker
-            i+=1
-            not_imported += 1
-            failure = 0
-        API_Calls += 1
+        print("Yahoo Error")
         failure += 1
-print("The amount of stocks we successfully imported: " + str(i - not_imported))
+print("Successfully imported: " + str(i - failure))
+# print("API calls = " + str(API_calls))
 
 # OBV Analysis, feel free to replace this section with your own analysis -------------------------------------------------------------------------
-stocklist_file = (glob.glob("./Daily_Stock_Report/Stocks/*.csv")) # Creates a list of all csv filenames in the stocks folder
-new_data = [] #  This will be a 2D array to hold our stock name and OBV score
-interval = 0  # Used for iteration
-while interval < len(stocklist_file):
-    data = pd.read_csv(stocklist_file[interval]).tail(10)  # Gets the last 10 days of trading for the current stock in iteration
-    pos_move = []  # List of days that the stock price increased
-    neg_move = []  # List of days that the stock price increased
+stocklist_file = (glob.glob("./Stock_Report/Stocks/*.csv")) 
+obv_data = [] 
+i = 0
+while i < len(stocklist_file):
+    data = pd.read_csv(stocklist_file[i])
+    movement = [] 
     OBV_Value = 0  # Sets the initial OBV_Value to zero
     count = 0
+    data = data.tail(10)
+    Moving_Average = 0
     if(data.empty == False):
         while (count < 10):  # 10 because we are looking at the last 10 trading days
+            Moving_Average += data.iloc[count,4]
             if data.iloc[count,1] < data.iloc[count,4]:  # True if the stock increased in price
-                pos_move.append(count)  
+                volume = data.iloc[count,5]/data.iloc[count,1]
+                movement.append(volume)
             elif data.iloc[count,1] > data.iloc[count,4]:  # True if the stock decreased in price
-                neg_move.append(count)  
+                volume = data.iloc[count,5]/data.iloc[count,1] * -1
+                movement.append(volume)
             count += 1
-        for i in pos_move:  # Adds the volumes of positive days to OBV_Value, divide by opening price to normalize across all stocks
-            OBV_Value = round(OBV_Value + (data.iloc[i,5]/data.iloc[i,1]))
-        for i in neg_move:  # Subtracts the volumes of negative days from OBV_Value, divide by opening price to normalize across all stocks
-            OBV_Value = round(OBV_Value - (data.iloc[i,5]/data.iloc[i,1]))
-        Stock_Name = ((os.path.basename(stocklist_file[interval])).split(".csv")[0])  # Get the name of the current stock we are analyzing
-        new_data.append([Stock_Name, OBV_Value])  
-    interval += 1
+        for j in movement:
+            OBV_Value = round(OBV_Value + j)
+        file_name = os.path.basename(stocklist_file[i])  # Get the name of the current stock we are analyzing
+        Stock_Name = file_name.split(".csv")
+        Stock_Name = Stock_Name[0]
+        Moving_Average = Moving_Average / 10 
+        new_data.append([Stock_Name, OBV_Value, Moving_Average])  
+    i += 1
 df = pd.DataFrame(new_data, columns = ['Stock', 'OBV_Value'])  # Creates a new dataframe from the new_data list
-df["Stocks_Ranked"] = df["OBV_Value"].rank(ascending = False)  # Rank the stocks by their OBV_Values
 df.sort_values("OBV_Value", inplace = True, ascending = False)  # Sort the ranked stocks
-df.to_csv("./Daily_Stock_Report/OBV_Ranked.csv", index = False)  # Save the dataframe to a csv without the index column
+df.to_csv("./Stock_Report/OBV_Ranked.csv", index = False)  # Save the dataframe to a csv without the index column
